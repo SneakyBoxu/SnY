@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cal In Cal Out",
     "slug": "cal-in-cal-out",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "calincalout",
@@ -12,7 +12,14 @@
     },
     "android": {
       "package": "com.sneakyboxu.calincalout",
-      "versionCode": 2,
+      "versionCode": 3,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0B0F14",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,6 +40,22 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to scan barcodes and photograph meals",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to pick meal photos so it can analyze them",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to photograph meals",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

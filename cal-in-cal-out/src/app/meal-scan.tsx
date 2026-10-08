@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { C } from '@/constants/theme';
 import { addDays, formatDayLabel, todayISO } from '@/lib/date';
@@ -111,6 +113,86 @@ export default function MealScanScreen() {
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
+  };
+
+  /* ---------------- NATIVE PHOTO CAPTURE / GALLERY (expo-image-picker) ---------------- */
+
+  const applyNativeImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    let base64: string | null = asset.base64 ?? null;
+    let uri = asset.uri;
+
+    // Downscale high-resolution mobile photos so the payload sends quickly (mirrors the web canvas path)
+    try {
+      const context = ImageManipulator.manipulate(asset.uri);
+      if (asset.width && asset.height) {
+        if (asset.width > asset.height) {
+          context.resize({ width: 1024, height: null });
+        } else {
+          context.resize({ height: 1024, width: null });
+        }
+      } else {
+        context.resize({ width: 1024, height: null });
+      }
+      const rendered = await context.renderAsync();
+      const saved = await rendered.saveAsync({
+        format: SaveFormat.JPEG,
+        compress: 0.82,
+        base64: true,
+      });
+      base64 = saved.base64 ?? base64;
+      uri = saved.uri || uri;
+    } catch {
+      // Keep the picker asset as-is if manipulation fails
+    }
+
+    if (!base64) {
+      setErrorMsg('Could not read the photo data. Please try another picture.');
+      return;
+    }
+
+    setImageBase64(`data:image/jpeg;base64,${base64}`);
+    setImageUri(uri);
+  };
+
+  const pickPhotoNative = async (source: 'camera' | 'library') => {
+    try {
+      setErrorMsg(null);
+      setEditableItems([]);
+
+      const perm =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setErrorMsg(
+          source === 'camera'
+            ? 'Camera permission is needed to photograph your plate. Grant it when asked.'
+            : 'Photo access is needed to choose a picture. Grant photo permission when asked.',
+        );
+        return;
+      }
+
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ quality: 0.9 })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.9,
+            });
+
+      if (result.canceled || !result.assets?.length) return;
+      await applyNativeImage(result.assets[0]);
+    } catch {
+      setErrorMsg('Could not open the camera or gallery. Please try again.');
+    }
+  };
+
+  const handlePhotoPress = () => {
+    if (isWeb) {
+      fileInputRef.current?.click();
+    } else {
+      pickPhotoNative('camera');
+    }
   };
 
   const handleRunAiAnalysis = async () => {
@@ -291,9 +373,7 @@ export default function MealScanScreen() {
           <View style={st.imageContainer}>
             <Image source={{ uri: imageUri }} style={st.foodImage} resizeMode="cover" />
             <Pressable
-              onPress={() => {
-                if (isWeb) fileInputRef.current?.click();
-              }}
+              onPress={handlePhotoPress}
               style={st.changePhotoOverlay}
             >
               <Ionicons name="camera" size={16} color="#fff" />
@@ -304,9 +384,7 @@ export default function MealScanScreen() {
           </View>
         ) : (
           <Pressable
-            onPress={() => {
-              if (isWeb) fileInputRef.current?.click();
-            }}
+            onPress={handlePhotoPress}
             style={({ pressed }) => [st.uploadPlaceholder, pressed && { opacity: 0.8 }]}
           >
             <View style={st.uploadIconCircle}>
@@ -320,6 +398,24 @@ export default function MealScanScreen() {
             </Txt>
           </Pressable>
         )}
+
+        {/* Native camera / gallery picker actions */}
+        {!isWeb ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', width: '100%' }}>
+            <Pressable onPress={() => pickPhotoNative('camera')} style={st.pickActionPill}>
+              <Ionicons name="camera-outline" size={16} color={C.text} />
+              <Txt size="xs" weight="800" color={C.text}>
+                Take Photo
+              </Txt>
+            </Pressable>
+            <Pressable onPress={() => pickPhotoNative('library')} style={st.pickActionPill}>
+              <Ionicons name="images-outline" size={16} color={C.blue} />
+              <Txt size="xs" weight="800" color={C.blue}>
+                Choose from Gallery
+              </Txt>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* User Preparation Hints Box */}
         <View style={{ width: '100%', gap: 6, marginTop: 4 }}>
@@ -650,6 +746,17 @@ const st = StyleSheet.create({
     backgroundColor: C.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pickActionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.surfaceHi,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   imageContainer: {
     width: '100%',

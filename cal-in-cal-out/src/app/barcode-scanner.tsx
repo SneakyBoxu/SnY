@@ -3,6 +3,8 @@ import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
 
 import { C } from '@/constants/theme';
 import { fmtInt } from '@/lib/num';
@@ -20,6 +22,19 @@ const POPULAR_BARCODES: { barcode: string; name: string; kcal: number; p: number
   { barcode: '4800888123456', name: 'Lucky Me! Pancit Canton Kalamansi', kcal: 460, p: 9, c: 62, f: 20, category: 'Grains & Starches' },
 ];
 
+// Native camera barcode formats (mirrors the web zxing format list)
+const EXPO_BARCODE_TYPES: BarcodeType[] = [
+  'ean13',
+  'ean8',
+  'upc_a',
+  'upc_e',
+  'code128',
+  'code39',
+  'itf14',
+  'codabar',
+  'qr',
+];
+
 export default function BarcodeScannerScreen() {
   const db = useDb();
   const params = useLocalSearchParams<{ mealType?: string }>();
@@ -30,14 +45,19 @@ export default function BarcodeScannerScreen() {
   const [foundFood, setFoundFood] = useState<Food | null>(null);
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
-  // Camera / image decoding state (web)
   const isWeb = Platform.OS === 'web';
+
+  // Camera / image decoding state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const readerRef = useRef<any>(null);
   const [scanning, setScanning] = useState(false);
   const [decodingImage, setDecodingImage] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const lockRef = useRef(false);
+
+  // Native camera permissions
+  const [nativePermission, requestNativePermission] = useCameraPermissions();
 
   const getScanner = () => {
     if (!readerRef.current) {
@@ -62,6 +82,7 @@ export default function BarcodeScannerScreen() {
     try {
       readerRef.current?.reset?.();
     } catch {}
+    lockRef.current = false;
     setScanning(false);
     setTorchOn(false);
   }, []);
@@ -158,7 +179,9 @@ export default function BarcodeScannerScreen() {
     [db],
   );
 
-  const startCamera = async () => {
+  /* ---------------- WEB CAMERA (zxing, unchanged) ---------------- */
+
+  const startCameraWeb = async () => {
     try {
       setFeedback(null);
       const reader = getScanner();
@@ -180,7 +203,7 @@ export default function BarcodeScannerScreen() {
     }
   };
 
-  const toggleTorch = async () => {
+  const toggleTorchWeb = async () => {
     const next = !torchOn;
     setTorchOn(next);
     try {
@@ -194,7 +217,7 @@ export default function BarcodeScannerScreen() {
     }
   };
 
-  const onPickImage = async (e: any) => {
+  const onPickImageWeb = async (e: any) => {
     const file = e.target?.files?.[0];
     if (!file) return;
     // Reset input so picking the same file again re-triggers change
@@ -222,6 +245,83 @@ export default function BarcodeScannerScreen() {
     }
   };
 
+  /* ---------------- NATIVE CAMERA (expo-camera) ---------------- */
+
+  const startCameraNative = async () => {
+    setFeedback(null);
+    let permission = nativePermission;
+    if (!permission?.granted) {
+      try {
+        permission = await requestNativePermission();
+      } catch {
+        permission = null;
+      }
+    }
+    if (!permission?.granted) {
+      setFeedback({
+        tone: 'err',
+        text: 'Camera permission is needed for live scanning. Grant it when asked, or import a photo below.',
+      });
+      return;
+    }
+    setScanning(true);
+  };
+
+  const handleNativeBarcode = useCallback(
+    (e: BarcodeScanningResult) => {
+      const text = e?.data ? String(e.data) : '';
+      if (!text || lockRef.current) return;
+      lockRef.current = true;
+      stopCamera();
+      setBarcodeInput(text);
+      lookupBarcode(text);
+    },
+    [lookupBarcode, stopCamera],
+  );
+
+  const importGalleryImageNative = async () => {
+    try {
+      setFeedback(null);
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setFeedback({
+          tone: 'err',
+          text: 'Photo access is needed to import a picture. Grant photo permission when asked.',
+        });
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      setDecodingImage(true);
+      const decoded = await Camera.scanFromURLAsync(asset.uri, EXPO_BARCODE_TYPES);
+      const text = decoded?.[0]?.data ? String(decoded[0].data) : '';
+      if (text) {
+        setBarcodeInput(text);
+        await lookupBarcode(text);
+      } else {
+        setFeedback({
+          tone: 'err',
+          text: 'Could not detect a barcode in that image. Try a clearer, well-lit, close-up photo of the barcode.',
+        });
+      }
+    } catch {
+      setFeedback({
+        tone: 'err',
+        text: 'Could not read that image. Try a clearer close-up photo.',
+      });
+    } finally {
+      setDecodingImage(false);
+    }
+  };
+
+  const startCamera = isWeb ? startCameraWeb : startCameraNative;
+  const toggleTorch = isWeb ? toggleTorchWeb : () => setTorchOn((v) => !v);
+  const importGalleryImage = isWeb ? undefined : importGalleryImageNative;
+
   const selectAndWeigh = (food: Food) => {
     router.replace({
       pathname: '/add-entry',
@@ -245,7 +345,7 @@ export default function BarcodeScannerScreen() {
           type="file"
           accept="image/*"
           style={{ display: 'none' }}
-          onChange={onPickImage}
+          onChange={onPickImageWeb}
         />
       ) : null}
 
@@ -259,6 +359,14 @@ export default function BarcodeScannerScreen() {
               playsInline
               style={{ width: '100%', height: '100%', objectFit: 'cover' } as any}
             />
+          ) : !isWeb && scanning ? (
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              enableTorch={torchOn}
+              barcodeScannerSettings={{ barcodeTypes: EXPO_BARCODE_TYPES }}
+              onBarcodeScanned={handleNativeBarcode}
+            />
           ) : (
             <View style={{ alignItems: 'center', gap: 6 }}>
               <Ionicons
@@ -267,7 +375,7 @@ export default function BarcodeScannerScreen() {
                 color={C.blue}
               />
               <Txt size="xs" weight="800" color={C.dim} align="center">
-                {scanning ? 'SCANNING...' : isWeb ? 'START CAMERA OR IMPORT A PHOTO' : 'ENTER BARCODE MANUALLY'}
+                {scanning ? 'SCANNING...' : 'START CAMERA OR IMPORT A PHOTO'}
               </Txt>
             </View>
           )}
@@ -281,57 +389,49 @@ export default function BarcodeScannerScreen() {
 
         {/* Controls */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12, justifyContent: 'center' }}>
-          {isWeb ? (
-            <>
-              <Pressable
-                onPress={() => (scanning ? stopCamera() : startCamera())}
-                style={[
-                  st.actionPill,
-                  scanning && { backgroundColor: C.accent, borderColor: C.accent },
-                ]}
-              >
-                <Ionicons
-                  name={scanning ? 'stop-circle-outline' : 'camera-outline'}
-                  size={16}
-                  color={scanning ? C.bg : C.text}
-                />
-                <Txt size="xs" weight="800" color={scanning ? C.bg : C.text}>
-                  {scanning ? 'Stop Camera' : 'Start Camera Scan'}
-                </Txt>
-              </Pressable>
-
-              <Pressable
-                onPress={() => fileInputRef.current?.click()}
-                disabled={decodingImage}
-                style={[st.actionPill, decodingImage && { opacity: 0.6 }]}
-              >
-                <Ionicons name="image-outline" size={16} color={C.blue} />
-                <Txt size="xs" weight="800" color={C.blue}>
-                  {decodingImage ? 'Reading Photo...' : 'Import Barcode Photo'}
-                </Txt>
-              </Pressable>
-
-              {scanning ? (
-                <Pressable
-                  onPress={toggleTorch}
-                  style={[st.actionPill, torchOn && { backgroundColor: C.warn, borderColor: C.warn }]}
-                >
-                  <Ionicons
-                    name={torchOn ? 'flash' : 'flash-outline'}
-                    size={16}
-                    color={torchOn ? C.bg : C.text}
-                  />
-                  <Txt size="xs" weight="800" color={torchOn ? C.bg : C.text}>
-                    {torchOn ? 'Torch On' : 'Torch Off'}
-                  </Txt>
-                </Pressable>
-              ) : null}
-            </>
-          ) : (
-            <Txt size="xs" color={C.dim} align="center">
-              Live camera scanning requires the native app build. Use manual entry below.
+          <Pressable
+            onPress={() => (scanning ? stopCamera() : startCamera())}
+            style={[
+              st.actionPill,
+              scanning && { backgroundColor: C.accent, borderColor: C.accent },
+            ]}
+          >
+            <Ionicons
+              name={scanning ? 'stop-circle-outline' : 'camera-outline'}
+              size={16}
+              color={scanning ? C.bg : C.text}
+            />
+            <Txt size="xs" weight="800" color={scanning ? C.bg : C.text}>
+              {scanning ? 'Stop Camera' : 'Start Camera Scan'}
             </Txt>
-          )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => (isWeb ? fileInputRef.current?.click() : importGalleryImage?.())}
+            disabled={decodingImage}
+            style={[st.actionPill, decodingImage && { opacity: 0.6 }]}
+          >
+            <Ionicons name="image-outline" size={16} color={C.blue} />
+            <Txt size="xs" weight="800" color={C.blue}>
+              {decodingImage ? 'Reading Photo...' : 'Import Barcode Photo'}
+            </Txt>
+          </Pressable>
+
+          {scanning ? (
+            <Pressable
+              onPress={toggleTorch}
+              style={[st.actionPill, torchOn && { backgroundColor: C.warn, borderColor: C.warn }]}
+            >
+              <Ionicons
+                name={torchOn ? 'flash' : 'flash-outline'}
+                size={16}
+                color={torchOn ? C.bg : C.text}
+              />
+              <Txt size="xs" weight="800" color={torchOn ? C.bg : C.text}>
+                {torchOn ? 'Torch On' : 'Torch Off'}
+              </Txt>
+            </Pressable>
+          ) : null}
         </View>
       </Card>
 
