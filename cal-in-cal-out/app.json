@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cal In Cal Out",
     "slug": "cal-in-cal-out",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "calincalout",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.sneakyboxu.calincalout",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0B0F14",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -24,6 +24,12 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/357bef93-170a-4131-b528-36dff4ccb496"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "plugins": [
       "expo-router",

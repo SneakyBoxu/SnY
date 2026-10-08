@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -15,6 +17,7 @@ import {
   Button,
   Card,
   CardTitle,
+  ConfirmModal,
   Divider,
   NumberField,
   Row,
@@ -42,6 +45,9 @@ export default function SettingsScreen() {
   const [manualStr, setManualStr] = useState('');
   const [foodCount, setFoodCount] = useState(0);
   const [sessions, setSessions] = useState(0);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+  const [updateReady, setUpdateReady] = useState(false);
 
   const refreshScreen = useCallback(async () => {
     const s = await getSettings(db);
@@ -69,6 +75,39 @@ export default function SettingsScreen() {
     setSettings(next);
     await saveSettings(db, changes);
     await recalculateAll(db);
+  };
+
+  const checkForUpdates = async () => {
+    if (Platform.OS === 'web') {
+      setUpdateMsg('Web version — just refresh the page to get the latest code.');
+      return;
+    }
+    setCheckingUpdate(true);
+    setUpdateMsg(null);
+    try {
+      const result = await Updates.checkForUpdateAsync();
+      if (!result.isAvailable) {
+        setUpdateMsg('✅ You are on the latest version.');
+      } else {
+        setUpdateMsg('⬇️ Update found — downloading…');
+        await Updates.fetchUpdateAsync();
+        setUpdateMsg('✅ Update downloaded. Restart the app to apply it.');
+        setUpdateReady(true);
+      }
+    } catch (e) {
+      setUpdateMsg(`❌ Update check failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const applyUpdateNow = async () => {
+    setUpdateReady(false);
+    try {
+      await Updates.reloadAsync();
+    } catch {
+      setUpdateMsg('❌ Could not restart automatically. Close and reopen the app.');
+    }
   };
 
   const activityLabel =
@@ -279,7 +318,42 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      {/* 4. ADVANCED SETTINGS LINK */}
+      {/* 4. APP UPDATES */}
+      <Card>
+        <CardTitle icon={<Ionicons name="cloud-download-outline" size={16} color={C.accent} />}>
+          APP UPDATES
+        </CardTitle>
+        <Row
+          title={`Version ${Constants.expoConfig?.version ?? '1.0.1'}`}
+          sub="Over-the-air updates apply bug fixes without reinstalling"
+        />
+        {updateMsg ? (
+          <View style={{ backgroundColor: C.surfaceHi, padding: 10, borderRadius: 8 }}>
+            <Txt size="xs" color={C.text} weight="600">
+              {updateMsg}
+            </Txt>
+          </View>
+        ) : null}
+        <Button
+          title={checkingUpdate ? 'Checking…' : 'Check for Updates'}
+          small
+          onPress={checkForUpdates}
+          disabled={checkingUpdate}
+        />
+      </Card>
+
+      {/* Update restart confirmation */}
+      <ConfirmModal
+        visible={updateReady}
+        title="Apply Update Now?"
+        message="The update has been downloaded. Restart the app to run the new version."
+        confirmText="Restart Now"
+        cancelText="Later"
+        onConfirm={applyUpdateNow}
+        onCancel={() => setUpdateReady(false)}
+      />
+
+      {/* 5. ADVANCED SETTINGS LINK */}
       <Card>
         <Pressable
           onPress={() => router.push('/advanced-settings' as never)}
