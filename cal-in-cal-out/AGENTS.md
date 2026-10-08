@@ -14,7 +14,6 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 
 ```bash
 npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
 npx expo lint               # lint
 npx tsc --noEmit            # typecheck
 npx expo-doctor             # diagnose dependency and config issues
@@ -22,6 +21,23 @@ npx expo install --fix      # fix incompatible package versions
 ```
 
 Run lint and typecheck before declaring any task done.
+
+## NEVER run the web dev server
+
+`expo start --web` / `npm run web` as a dev server is **broken and dangerous** in this project: the
+SDK 57 web dev server hangs on the SQLite web worker chunk, silently consumes gigabytes of RAM, and
+squats on port 8081 for days. Never run it, even to test.
+
+The desktop web flow is:
+
+```bash
+npx expo export --platform web --output-dir dist   # build (exits when done)
+node serve-web.mjs                                  # serve at http://localhost:8081
+```
+
+If port 8081 is already taken, kill the process holding it (`netstat -aon | findstr :8081`, then
+`taskkill /F /PID <pid>`) before starting `serve-web.mjs`. `start-web.cmd` in the repo root does
+all of this automatically. `expo start` (no --web) is fine for phone development via Expo Go.
 
 ## Navigation & Routing
 

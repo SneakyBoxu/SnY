@@ -42,7 +42,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "build:web": "expo export --platform web --output-dir dist",
+    "web": "node serve-web.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "tsx tests/tdee.test.ts && tsx tests/lifting.test.ts && tsx tests/nutrition.test.ts"
