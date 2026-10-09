@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SQLite from 'expo-sqlite';
 
-import { C } from '@/constants/theme';
+import { C, applyTheme, type ThemeId } from '@/constants/theme';
 import { SEED_FOODS, SEED_VERSION } from '@/db/seed-foods';
 import SEED_EXERCISES_JSON from '@/db/seed-exercises.json';
 import {
@@ -174,6 +174,25 @@ export async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
   await seedWorkoutData(db);
   await seedExercisesCatalog(db);
   await ensureDefaultSettings(db);
+  try {
+    const themeRow = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM settings WHERE key = 'app_theme'",
+    );
+    let customConfig;
+    if (themeRow?.value === 'custom') {
+      const cfgRow = await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM settings WHERE key = 'custom_theme_config'",
+      );
+      if (cfgRow?.value) {
+        try {
+          customConfig = JSON.parse(cfgRow.value);
+        } catch {}
+      }
+    }
+    if (themeRow?.value) {
+      applyTheme(themeRow.value, customConfig);
+    }
+  } catch {}
   await recalculateAll(db);
   return db;
 }

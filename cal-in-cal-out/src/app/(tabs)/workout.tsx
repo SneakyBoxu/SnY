@@ -416,6 +416,30 @@ export default function WorkoutScreen() {
         </Card>
       ) : null}
 
+      {/* WORKOUT EXERCISE CATALOG */}
+      <Card>
+        <Pressable
+          onPress={() => router.push('/exercise-catalog' as any)}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', gap: 12 },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <View style={st.catalogIconCircle}>
+            <Ionicons name="barbell" size={20} color={C.accent} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Txt size="md" weight="800" color={C.text}>
+              Workout Exercise Catalog
+            </Txt>
+            <Txt size="xs" color={C.dim}>
+              Browse 900+ exercises, anatomy filters, & custom lifts
+            </Txt>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.dim} />
+        </Pressable>
+      </Card>
+
       {/* ======================================================== */}
       {/* MY ROUTINES CATALOG (HEVY / STRONG STYLE)                */}
       {/* ======================================================== */}
@@ -685,30 +709,6 @@ export default function WorkoutScreen() {
             ) : null}
           </>
         )}
-      </Card>
-
-      {/* SEPARATE WORKOUT CATALOG CARD */}
-      <Card>
-        <Pressable
-          onPress={() => router.push('/exercise-catalog' as any)}
-          style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', gap: 12 },
-            pressed && { opacity: 0.8 },
-          ]}
-        >
-          <View style={st.catalogIconCircle}>
-            <Ionicons name="barbell" size={20} color={C.accent} />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Txt size="md" weight="800" color={C.text}>
-              Workout Exercise Catalog
-            </Txt>
-            <Txt size="xs" color={C.dim}>
-              Browse 900+ exercises, anatomy filters, & custom lifts
-            </Txt>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={C.dim} />
-        </Pressable>
       </Card>
 
       {/* RECENT SESSIONS */}
