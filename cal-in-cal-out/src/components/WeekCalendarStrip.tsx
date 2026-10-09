@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  GestureResponderEvent,
   LayoutChangeEvent,
   Modal,
   Platform,
@@ -114,18 +113,19 @@ export function WeekCalendarStrip({
     currentViewWeekIdxRef.current = selectedWeekIndex;
   }, [selectedWeekIndex]);
 
-  // Initial scroll to selected week or this week
+  // Scroll to selected week (instant on initial mount, animated when selectedDate changes)
+  const hasScrolledInitially = useRef(false);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (scrollRef.current && containerWidth > 0) {
-        scrollRef.current.scrollTo({
-          x: selectedWeekIndex * containerWidth,
-          animated: false,
-        });
-      }
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [containerWidth, selectedWeekIndex]);
+    if (scrollRef.current && containerWidth > 0) {
+      const animated = hasScrolledInitially.current;
+      scrollRef.current.scrollTo({
+        x: selectedWeekIndex * containerWidth,
+        animated,
+      });
+      hasScrolledInitially.current = true;
+      currentViewWeekIdxRef.current = selectedWeekIndex;
+    }
+  }, [selectedWeekIndex, containerWidth]);
 
   const onContainerLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
@@ -138,37 +138,6 @@ export function WeekCalendarStrip({
         });
       }
     }
-  };
-
-  // Drag scrubber across the 7 days of the currently visible week
-  const isDraggingDayRef = useRef(false);
-  const currentWeekRef = useRef<WeekItem>(weeks[selectedWeekIndex] || weeks[THIS_WEEK_PAGE_INDEX]);
-  currentWeekRef.current = weeks[currentViewWeekIdxRef.current] || weeks[THIS_WEEK_PAGE_INDEX];
-
-  const handleDaySelectFromX = (locationX: number) => {
-    const week = currentWeekRef.current;
-    if (!week || !week.days || week.days.length === 0) return;
-    const dayWidth = containerWidth / 7;
-    const rawIdx = Math.floor(locationX / dayWidth);
-    const dayIdx = Math.max(0, Math.min(6, rawIdx));
-    const targetDay = week.days[dayIdx];
-    if (targetDay && targetDay.dateISO !== selectedDate) {
-      onSelectDate(targetDay.dateISO);
-    }
-  };
-
-  const handlePointerDown = (e: GestureResponderEvent) => {
-    isDraggingDayRef.current = true;
-    handleDaySelectFromX(e.nativeEvent.locationX);
-  };
-
-  const handlePointerMove = (e: GestureResponderEvent) => {
-    if (!isDraggingDayRef.current) return;
-    handleDaySelectFromX(e.nativeEvent.locationX);
-  };
-
-  const handlePointerUp = () => {
-    isDraggingDayRef.current = false;
   };
 
   // Title formatting for the top header
@@ -236,37 +205,13 @@ export function WeekCalendarStrip({
         </View>
       </View>
 
-      {/* 2. HOLD & DRAG WEEK CALENDAR STRIP */}
-      <View
-        style={st.stripContainer}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onResponderGrant={handlePointerDown}
-        onResponderMove={handlePointerMove}
-        onResponderRelease={handlePointerUp}
-        onResponderTerminate={handlePointerUp}
-        {...(Platform.OS === 'web'
-          ? ({
-              onPointerDown: handlePointerDown,
-              onPointerMove: handlePointerMove,
-              onPointerUp: handlePointerUp,
-              onPointerCancel: handlePointerUp,
-              style: [
-                st.stripContainer,
-                {
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  touchAction: 'pan-x',
-                  WebkitUserSelect: 'none',
-                } as any,
-              ],
-            } as any)
-          : {})}
-      >
+      {/* 2. WEEK CALENDAR STRIP */}
+      <View style={st.stripContainer}>
         <ScrollView
           ref={scrollRef}
           horizontal
           pagingEnabled
+          decelerationRate="fast"
           showsHorizontalScrollIndicator={false}
           scrollEnabled={true}
           onMomentumScrollEnd={(e) => {
