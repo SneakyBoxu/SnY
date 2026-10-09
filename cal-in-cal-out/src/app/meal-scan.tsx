@@ -30,6 +30,7 @@ import {
   Divider,
   NumberField,
   Screen,
+  TextField,
   Txt,
 } from '@/components/ui';
 import { analyzeMealImage, VisionFoodItem } from '@/services/geminiVision';
@@ -652,11 +653,12 @@ export default function MealScanScreen() {
                 </Pressable>
               </View>
 
-              <NumberField
+              <TextField
                 label="Food Name"
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="e.g. Pork Adobo, White Rice…"
+                autoCapitalize="words"
               />
 
               <NumberField

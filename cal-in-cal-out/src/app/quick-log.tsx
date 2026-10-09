@@ -26,6 +26,7 @@ import {
   Divider,
   NumberField,
   Screen,
+  TextField,
   Txt,
 } from '@/components/ui';
 import { parseMealTextWithAi, VisionFoodItem } from '@/services/geminiVision';
@@ -456,11 +457,12 @@ export default function QuickLogScreen() {
                 </Pressable>
               </View>
 
-              <NumberField
+              <TextField
                 label="Food Name"
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="e.g. Pork Steak, White Rice…"
+                autoCapitalize="words"
               />
 
               <NumberField

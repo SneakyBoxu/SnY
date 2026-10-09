@@ -44,6 +44,7 @@ import {
   EmptyHint,
   NumberField,
   Screen,
+  TextField,
   Txt,
 } from '@/components/ui';
 
@@ -797,12 +798,13 @@ export default function WorkoutScreen() {
 
                 {/* Rename Routine Title */}
                 <View style={{ gap: 6 }}>
-                  <NumberField
+                  <TextField
                     label="Routine Title"
                     value={editRoutineNameInput}
                     onChangeText={setEditRoutineNameInput}
                     onCommit={handleSaveRoutineTitle}
                     placeholder="e.g. Push, Pull, Legs…"
+                    autoCapitalize="words"
                   />
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Txt size="xs" color={C.accent} weight="700">
@@ -842,11 +844,12 @@ export default function WorkoutScreen() {
                 {/* Add New Exercise to Routine */}
                 {showAddExerciseBox ? (
                   <View style={st.addExerciseBox}>
-                    <NumberField
+                    <TextField
                       label="New Exercise Name"
                       value={newExerciseInput}
                       onChangeText={setNewExerciseInput}
                       placeholder="e.g. Dumbbell Shoulder Press, Lateral Raises…"
+                      autoCapitalize="words"
                     />
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                       <Button

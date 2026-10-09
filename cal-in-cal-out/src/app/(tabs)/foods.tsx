@@ -4,6 +4,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -165,12 +166,16 @@ export default function FoodsScreen() {
       {/* 1. SEARCH BAR */}
       <View style={st.searchContainer}>
         <Ionicons name="search-outline" size={18} color={C.dim} style={{ marginLeft: 4 }} />
-        <NumberField
-          label=""
+        <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search 270+ foods, ulam, or global products…"
-          style={{ margin: 0, flex: 1 }}
+          placeholderTextColor={C.dimmer}
+          style={st.searchInput}
+          autoCorrect={false}
+          autoCapitalize="none"
+          keyboardType="default"
+          returnKeyType="search"
         />
         {query ? (
           <Pressable
@@ -630,6 +635,14 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     gap: 6,
+  },
+  searchInput: {
+    flex: 1,
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '600',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
   scanBtn: {
     flexDirection: 'row',

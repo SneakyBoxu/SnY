@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  KeyboardTypeOptions,
   Modal,
   Platform,
   Pressable,
@@ -255,13 +256,15 @@ export function Segmented({
   options,
   value,
   onChange,
+  style,
 }: {
   options: string[];
   value: string;
   onChange: (v: string) => void;
+  style?: object;
 }) {
   return (
-    <View style={s.segmented}>
+    <View style={[s.segmented, style]}>
       {options.map((o) => {
         const active = o === value;
         return (
@@ -377,7 +380,7 @@ export function MacroBar({
   );
 }
 
-export function NumberField({
+export function TextField({
   label,
   value,
   onChangeText,
@@ -386,6 +389,9 @@ export function NumberField({
   placeholder,
   style,
   inputStyle,
+  keyboardType = 'default',
+  autoCapitalize = 'sentences',
+  autoCorrect = true,
 }: {
   label?: string;
   value: string;
@@ -395,7 +401,11 @@ export function NumberField({
   placeholder?: string;
   style?: object;
   inputStyle?: object;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
 }) {
+  const isDecimal = keyboardType === 'decimal-pad' || keyboardType === 'numeric';
   return (
     <View style={[{ gap: 4, minWidth: 0 }, style]}>
       {label ? (
@@ -407,7 +417,7 @@ export function NumberField({
         {Platform.OS === 'web' ? (
           <input
             type="text"
-            inputMode="decimal"
+            inputMode={isDecimal ? 'decimal' : 'text'}
             value={value}
             onChange={(e: any) => onChangeText(e.target.value)}
             onBlur={onCommit}
@@ -439,7 +449,9 @@ export function NumberField({
             onSubmitEditing={onCommit}
             placeholder={placeholder}
             placeholderTextColor={C.dimmer}
-            keyboardType="decimal-pad"
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            autoCorrect={autoCorrect}
             style={{ color: C.text, fontSize: 16, fontWeight: '700', padding: 0, flex: 1 }}
             selectionColor={C.accent}
           />
@@ -451,6 +463,17 @@ export function NumberField({
         ) : null}
       </View>
     </View>
+  );
+}
+
+export function NumberField(props: Parameters<typeof TextField>[0]) {
+  return (
+    <TextField
+      keyboardType="decimal-pad"
+      autoCapitalize="none"
+      autoCorrect={false}
+      {...props}
+    />
   );
 }
 
@@ -521,7 +544,7 @@ export function Row({
       disabled={!onPress && !onLongPress}
       style={({ pressed }) => [s.row, pressed && { opacity: 0.7 }]}
     >
-      <View style={{ flex: 1, gap: 3 }}>
+      <View style={{ flex: 1, gap: 3, paddingRight: right ? 8 : 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Txt size="md" weight="700">
             {title}
@@ -534,7 +557,7 @@ export function Row({
           </Txt>
         ) : null}
       </View>
-      {right}
+      {right ? <View style={{ flexShrink: 0, alignItems: 'flex-end' }}>{right}</View> : null}
     </Pressable>
   );
 }
@@ -816,6 +839,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   stepperBtn: {
     width: 34,

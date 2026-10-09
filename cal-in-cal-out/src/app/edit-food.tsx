@@ -15,6 +15,7 @@ import {
   ChipRow,
   NumberField,
   Screen,
+  TextField,
   Txt,
 } from '@/components/ui';
 
@@ -146,11 +147,12 @@ export default function EditFoodScreen() {
     >
       <Card>
         <CardTitle>Food Details</CardTitle>
-        <NumberField
+        <TextField
           label="Food Name"
           value={name}
           onChangeText={setName}
           placeholder="e.g. Kopiko Blanca (1 Sachet)"
+          autoCapitalize="words"
         />
         <View style={{ flexDirection: 'row', gap: Spacing.s, marginTop: Spacing.s }}>
           <NumberField style={{ flex: 1 }} label="kcal / 100g" value={kcal} onChangeText={setKcal} placeholder="165" />
@@ -161,7 +163,7 @@ export default function EditFoodScreen() {
           <NumberField style={{ flex: 1 }} label="Fat (g)" value={fat} onChangeText={setFat} placeholder="3.6" />
         </View>
         <View style={{ flexDirection: 'row', gap: Spacing.s, marginTop: Spacing.s }}>
-          <NumberField
+          <TextField
             label="Serving Unit"
             value={servingUnit}
             onChangeText={setServingUnit}

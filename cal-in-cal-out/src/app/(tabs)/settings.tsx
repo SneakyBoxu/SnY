@@ -187,23 +187,27 @@ export default function SettingsScreen() {
 
         <Divider />
 
-        <Row
-          title="Target Mode"
-          sub={settings.manual_target_calories !== null ? 'Fixed target override' : 'Dynamically managed by TDEE algorithm'}
-          right={
-            <Segmented
-              options={['Auto', 'Manual']}
-              value={settings.manual_target_calories !== null ? 'Manual' : 'Auto'}
-              onChange={(v) => {
-                if (v === 'Manual') {
-                  persist({ manual_target_calories: 2000 });
-                } else {
-                  persist({ manual_target_calories: null });
-                }
-              }}
-            />
-          }
-        />
+        <View style={{ gap: 6 }}>
+          <View style={{ gap: 2 }}>
+            <Txt size="xs" color={C.dimmer} weight="700" style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Target Mode
+            </Txt>
+            <Txt size="xs" color={C.dim} weight="500">
+              {settings.manual_target_calories !== null ? 'Fixed target override' : 'Dynamically managed by TDEE algorithm'}
+            </Txt>
+          </View>
+          <Segmented
+            options={['Auto', 'Manual']}
+            value={settings.manual_target_calories !== null ? 'Manual' : 'Auto'}
+            onChange={(v) => {
+              if (v === 'Manual') {
+                persist({ manual_target_calories: 2000 });
+              } else {
+                persist({ manual_target_calories: null });
+              }
+            }}
+          />
+        </View>
 
         {settings.manual_target_calories !== null ? (
           <NumberField
@@ -273,16 +277,16 @@ export default function SettingsScreen() {
         <CardTitle icon={<Ionicons name="person-outline" size={16} color={C.blue} />}>
           ANTHROPOMETRIC BASELINE
         </CardTitle>
-        <Row
-          title="Biological Sex"
-          right={
-            <Segmented
-              options={['Male', 'Female']}
-              value={settings.sex === 'male' ? 'Male' : 'Female'}
-              onChange={(v) => persist({ sex: v === 'Male' ? 'male' : 'female' })}
-            />
-          }
-        />
+        <View style={{ gap: 6 }}>
+          <Txt size="xs" color={C.dimmer} weight="700" style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            Biological Sex
+          </Txt>
+          <Segmented
+            options={['Male', 'Female']}
+            value={settings.sex === 'male' ? 'Male' : 'Female'}
+            onChange={(v) => persist({ sex: v === 'Male' ? 'male' : 'female' })}
+          />
+        </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <NumberField
             label="Age"

@@ -32,6 +32,7 @@ import {
   ConfirmModal,
   Divider,
   NumberField,
+  TextField,
   Txt,
 } from '@/components/ui';
 import { clearSession, getSession, saveSession } from '@/lib/workoutSession';
@@ -1309,11 +1310,12 @@ export default function ActiveWorkoutScreen() {
                 </Pressable>
               </View>
 
-              <NumberField
+              <TextField
                 label="Exercise Name"
                 value={newExName}
                 onChangeText={setNewExName}
                 placeholder="e.g. Lateral Raises, Cable Flyes…"
+                autoCapitalize="words"
               />
 
               <Button
@@ -1498,11 +1500,12 @@ export default function ActiveWorkoutScreen() {
                   {/* Replace Exercise */}
                   {showReplaceInput ? (
                     <View style={st.replaceInputBox}>
-                      <NumberField
+                      <TextField
                         label="Replacement Exercise Name"
                         value={replaceNameInput}
                         onChangeText={setReplaceNameInput}
                         placeholder="e.g. Incline Dumbbell Press, Cable Flyes…"
+                        autoCapitalize="words"
                       />
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                         <Button

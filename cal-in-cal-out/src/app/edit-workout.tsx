@@ -21,6 +21,7 @@ import {
   NumberField,
   Screen,
   Segmented,
+  TextField,
   Txt,
 } from '@/components/ui';
 
@@ -149,18 +150,20 @@ export default function EditWorkoutScreen() {
     >
       <Card>
         <CardTitle>Exercise</CardTitle>
-        <NumberField
+        <TextField
           label=""
           value={exercise}
           onChangeText={setExercise}
           placeholder="e.g. Barbell Bench Press"
+          autoCapitalize="words"
         />
         <View style={{ flexDirection: 'row', gap: 10, marginTop: Spacing.s }}>
-          <NumberField
+          <TextField
             label="Weight (lbs)"
             value={weight}
             onChangeText={setWeight}
             placeholder="75 / BW"
+            keyboardType="default"
             style={{ flex: 1.4 }}
           />
           <NumberField
@@ -170,12 +173,13 @@ export default function EditWorkoutScreen() {
             placeholder="3"
             style={{ flex: 0.9 }}
           />
-          <NumberField
+          <TextField
             label="Reps"
             value={reps}
             onChangeText={setReps}
             placeholder="12,12,10"
-            style={{ flex: 1.3 }}
+            keyboardType="numbers-and-punctuation"
+            style={{ flex: 1.4 }}
           />
         </View>
         <Txt size="xs" style={{ color: '#8B99A8', marginTop: 4 }}>

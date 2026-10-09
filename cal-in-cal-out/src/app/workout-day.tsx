@@ -23,7 +23,7 @@ import {
   listWorkoutEntries,
   updateWorkoutEntry,
 } from '@/db/workouts';
-import { Button, ConfirmModal, NumberField, Screen, Txt } from '@/components/ui';
+import { Button, ConfirmModal, NumberField, Screen, TextField, Txt } from '@/components/ui';
 
 export type SetType = 'NORMAL' | 'WARMUP' | 'FAILURE' | 'DROP';
 
@@ -698,11 +698,12 @@ export default function WorkoutDayScreen() {
             </View>
 
             <View style={{ gap: 8 }}>
-              <NumberField
+              <TextField
                 label="New Exercise Name"
                 value={replaceNameInput}
                 onChangeText={setReplaceNameInput}
                 placeholder="e.g. Incline Bench Press…"
+                autoCapitalize="words"
               />
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                 <Button

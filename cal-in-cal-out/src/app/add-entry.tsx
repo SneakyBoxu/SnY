@@ -38,6 +38,7 @@ import {
   Divider,
   NumberField,
   Screen,
+  TextField,
   Txt,
 } from '@/components/ui';
 import { OpenFoodFactsProduct, searchOpenFoodFacts } from '@/services/openFoodFacts';
@@ -605,11 +606,16 @@ export default function AddEntryScreen() {
           {/* Search Box */}
           <View style={st.searchBar}>
             <Ionicons name="search-outline" size={16} color={C.dim} />
-            <NumberField
+            <TextInput
               value={foodSearchQuery}
               onChangeText={setFoodSearchQuery}
               placeholder="Search 270+ foods, ulam, snacks, candies…"
-              style={{ flex: 1, margin: 0 }}
+              placeholderTextColor={C.dimmer}
+              style={{ color: C.text, fontSize: 14, fontWeight: '600', paddingVertical: 10, paddingHorizontal: 4, flex: 1 }}
+              autoCorrect={false}
+              autoCapitalize="none"
+              keyboardType="default"
+              returnKeyType="search"
             />
             {foodSearchQuery ? (
               <Pressable onPress={() => setFoodSearchQuery('')} style={{ padding: 4 }}>
@@ -788,11 +794,12 @@ export default function AddEntryScreen() {
                   </Txt>
                 </Pressable>
               </View>
-              <NumberField
+              <TextField
                 label="Food Name"
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. Chicken Breast, Rice, Eggs…"
+                autoCapitalize="words"
               />
             </View>
           )}
