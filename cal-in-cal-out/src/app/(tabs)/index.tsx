@@ -993,7 +993,7 @@ export default function TodayScreen() {
           <View style={{ gap: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
               <Txt size="hero" weight="900" color={C.weight} style={{ letterSpacing: -1 }}>
-                {data.trendWeight !== null ? fmtNum(data.trendWeight) : '—'}
+                {data.trendWeight !== null ? fmtNum(data.trendWeight, 2) : '—'}
               </Txt>
               <Txt size="md" weight="700" color={C.dim}>
                 kg trend
@@ -1001,7 +1001,7 @@ export default function TodayScreen() {
             </View>
             {data.day?.weight_kg != null ? (
               <Txt size="xs" color={C.dimmer} weight="600">
-                {`Scale: ${fmtNum(data.day.weight_kg)} kg`}
+                {`Scale: ${fmtNum(data.day.weight_kg, 2)} kg`}
               </Txt>
             ) : (
               <Txt size="xs" color={C.dimmer} weight="500">
@@ -1018,7 +1018,7 @@ export default function TodayScreen() {
                 color={data.weeklyChange <= 0 ? C.accent : C.warn}
               />
               <Txt size="xs" weight="800" color={data.weeklyChange <= 0 ? C.accent : C.warn}>
-                {`${fmtSigned(data.weeklyChange)} kg/wk`}
+                {`${fmtSigned(data.weeklyChange, 2)} kg/wk`}
               </Txt>
             </View>
           ) : null}
@@ -1031,7 +1031,7 @@ export default function TodayScreen() {
             value={weightStr}
             onChangeText={setWeightStr}
             suffix="kg"
-            placeholder={data.trendWeight ? String(fmtNum(data.trendWeight)) : '77.5'}
+            placeholder={data.trendWeight ? String(fmtNum(data.trendWeight, 2)) : '77.5'}
             style={{ flex: 1, margin: 0 }}
           />
           <Button title="Save" small onPress={() => onSaveWeight()} />

@@ -417,20 +417,20 @@ export default function TrendsScreen() {
           </CardTitle>
           <StatGrid>
             <StatCell>
-              <Stat label="Trend Weight" value={trendNow !== null ? `${fmtNum(trendNow)} kg` : '—'} color={C.weight} />
+              <Stat label="Trend Weight" value={trendNow !== null ? `${fmtNum(trendNow, 2)} kg` : '—'} color={C.weight} />
             </StatCell>
             <StatCell>
-              <Stat label="Weekly Rate" value={weeklyChange !== null ? `${fmtSigned(weeklyChange)} kg/wk` : '—'} color={C.accent} />
+              <Stat label="Weekly Rate" value={weeklyChange !== null ? `${fmtSigned(weeklyChange, 2)} kg/wk` : '—'} color={C.accent} />
             </StatCell>
             <StatCell>
-              <Stat label="Latest Raw Scale" value={rawLatest !== null ? `${fmtNum(rawLatest)} kg` : '—'} />
+              <Stat label="Latest Raw Scale" value={rawLatest !== null ? `${fmtNum(rawLatest, 2)} kg` : '—'} />
             </StatCell>
             <StatCell>
               <Stat
                 label={`Range Delta (${from.slice(5)})`}
                 value={
                   trendNow !== null && firstTrend !== null
-                    ? `${fmtSigned(trendNow - firstTrend)} kg`
+                    ? `${fmtSigned(trendNow - firstTrend, 2)} kg`
                     : '—'
                 }
               />

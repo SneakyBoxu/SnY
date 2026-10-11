@@ -67,6 +67,7 @@ const UNIT_KEYWORDS = [
 
 function formatUnitName(unit: string): string {
   const clean = unit.trim().toLowerCase();
+  if (clean === 'g' || clean === 'gram' || clean === 'grams' || clean === 'gr') return 'Serving';
   if (clean === 'pc' || clean === 'piece') return 'Piece';
   if (clean === 'tbsp') return 'Tablespoon';
   return clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -181,7 +182,9 @@ export function foodToFoodItem(
 
   if (hasNativeServing) {
     const servingWeight = weight!;
-    const servingUnit = unit || 'Serving';
+    const rawUnit = unit?.trim().toLowerCase();
+    const isGramUnit = !rawUnit || ['g', 'gram', 'grams', 'gr'].includes(rawUnit);
+    const servingUnit = isGramUnit ? 'Serving' : formatUnitName(unit!);
 
     // Detect if food.calories_per_100g was stored as single-serving base calories
     // (e.g. "Nescafé Classic Stick 1.9g" stored with 5 kcal).

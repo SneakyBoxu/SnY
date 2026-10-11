@@ -91,8 +91,13 @@ const server = http.createServer((req, res) => {
           process.env.GEMINI_API_KEY ||
           '';
 
-        // Free-tier high-throughput models (primary is gemini-3.5-flash which is responsive and not rate-limited)
-        const models = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+        const models = [
+          'gemini-1.5-flash-8b',
+          'gemini-1.5-flash',
+          'gemini-2.0-flash',
+          'gemini-2.5-flash',
+          'gemini-3.5-flash',
+        ];
         let lastRespText = '';
         let lastStatus = 500;
 

@@ -58,7 +58,27 @@ function parseProduct(p: any): OpenFoodFactsProduct | null {
   }
 
   const servingSize = p.serving_size ? String(p.serving_size).trim() : undefined;
-  const servingInfo = extractServingInfo(name, servingSize);
+  let servingInfo = extractServingInfo(name, servingSize);
+
+  if (!servingInfo.servingWeightGrams && p.serving_quantity) {
+    const sq = Number(p.serving_quantity);
+    if (Number.isFinite(sq) && sq > 0) {
+      servingInfo = {
+        servingWeightGrams: Math.round(sq * 10) / 10,
+        servingUnitName: servingInfo.servingUnitName || 'Serving',
+      };
+    }
+  }
+
+  if (!servingInfo.servingWeightGrams && p.quantity) {
+    const qInfo = extractServingInfo(String(p.quantity));
+    if (qInfo.servingWeightGrams && qInfo.servingWeightGrams > 0) {
+      servingInfo = {
+        servingWeightGrams: qInfo.servingWeightGrams,
+        servingUnitName: qInfo.servingUnitName || 'Pack',
+      };
+    }
+  }
 
   return {
     barcode: p.code ? String(p.code) : '',

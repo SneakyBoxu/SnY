@@ -1,28 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BarcodeFormat, BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Camera, CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
 
 import { C } from '@/constants/theme';
 import { fmtInt } from '@/lib/num';
 import type { Food } from '@/lib/types';
 import { useDb } from '@/db/db';
-import { createFood, getFoodByBarcode } from '@/db/queries';
+import { createFood, getFoodByBarcode, getSettings } from '@/db/queries';
 import { Button, Card, CardTitle, Divider, NumberField, Screen, Txt } from '@/components/ui';
 import { lookupBarcodeOpenFoodFacts } from '@/services/openFoodFacts';
+import { analyzeNutritionLabelImage } from '@/services/geminiVision';
+import { extractServingInfo } from '@/lib/nutrition';
 
 // Offline sample test barcodes for quick demo/testing
-const POPULAR_BARCODES: { barcode: string; name: string; kcal: number; p: number; c: number; f: number; category: string }[] = [
-  { barcode: '4800016644801', name: 'Century Tuna Flakes in Oil (Canned)', kcal: 180, p: 21, c: 0, f: 10.5, category: 'Seafood' },
-  { barcode: '4800016053016', name: 'San Marino Corned Tuna', kcal: 165, p: 18, c: 2.5, f: 9.5, category: 'Seafood' },
-  { barcode: '4800011122334', name: 'SkyFlakes Crackers (per pack 28g)', kcal: 430, p: 9, c: 68, f: 14, category: 'Snacks & Sweets' },
-  { barcode: '4800888123456', name: 'Lucky Me! Pancit Canton Kalamansi', kcal: 460, p: 9, c: 62, f: 20, category: 'Grains & Starches' },
+const POPULAR_BARCODES: {
+  barcode: string;
+  name: string;
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+  category: string;
+  servingGrams?: number;
+  servingUnit?: string;
+}[] = [
+  { barcode: '4800016644801', name: 'Century Tuna Flakes in Oil (Canned)', kcal: 180, p: 21, c: 0, f: 10.5, category: 'Seafood', servingGrams: 155, servingUnit: 'Can' },
+  { barcode: '4800016053016', name: 'San Marino Corned Tuna', kcal: 165, p: 18, c: 2.5, f: 9.5, category: 'Seafood', servingGrams: 150, servingUnit: 'Can' },
+  { barcode: '4800011122334', name: 'SkyFlakes Crackers (per pack 28g)', kcal: 430, p: 9, c: 68, f: 14, category: 'Snacks & Sweets', servingGrams: 28, servingUnit: 'Pack' },
+  { barcode: '4800888123456', name: 'Lucky Me! Pancit Canton Kalamansi', kcal: 460, p: 9, c: 62, f: 20, category: 'Grains & Starches', servingGrams: 80, servingUnit: 'Pack' },
 ];
 
-// Native camera barcode formats (mirrors the web zxing format list)
+// Native camera barcode formats
 const EXPO_BARCODE_TYPES: BarcodeType[] = [
   'ean13',
   'ean8',
@@ -43,17 +56,24 @@ export default function BarcodeScannerScreen() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [searching, setSearching] = useState(false);
   const [foundFood, setFoundFood] = useState<Food | null>(null);
-  const [feedback, setFeedback] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: 'ok' | 'err';
+    text: string;
+    unmatchedBarcode?: string;
+    pendingAsset?: any;
+  } | null>(null);
 
   const isWeb = Platform.OS === 'web';
 
   // Camera / image decoding state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const labelFileInputRef = useRef<HTMLInputElement | null>(null);
   const readerRef = useRef<any>(null);
   const [scanning, setScanning] = useState(false);
   const [decodingImage, setDecodingImage] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [analyzingLabel, setAnalyzingLabel] = useState(false);
   const lockRef = useRef(false);
 
   // Native camera permissions
@@ -102,6 +122,19 @@ export default function BarcodeScannerScreen() {
       // 1. Check local SQLite database by barcode
       let food = await getFoodByBarcode(db, clean);
 
+      // If local food exists but has no serving size, try auto-repairing from food name
+      if (food && !food.serving_weight_grams) {
+        const extracted = extractServingInfo(food.food_name);
+        if (extracted.servingWeightGrams) {
+          food.serving_weight_grams = extracted.servingWeightGrams;
+          food.serving_unit_name = extracted.servingUnitName;
+          await db.runAsync(
+            'UPDATE custom_foods SET serving_weight_grams = ?, serving_unit_name = ? WHERE id = ?',
+            [extracted.servingWeightGrams, extracted.servingUnitName ?? null, food.id],
+          );
+        }
+      }
+
       // 2. Check offline demo sample barcodes
       if (!food) {
         const sample = POPULAR_BARCODES.find((b) => b.barcode === clean);
@@ -114,6 +147,8 @@ export default function BarcodeScannerScreen() {
             fat_per_100g: sample.f,
             category: sample.category,
             barcode: sample.barcode,
+            serving_weight_grams: sample.servingGrams,
+            serving_unit_name: sample.servingUnit,
           });
           food = {
             id: newId,
@@ -125,6 +160,8 @@ export default function BarcodeScannerScreen() {
             category: sample.category,
             is_seed: 0,
             barcode: sample.barcode,
+            serving_weight_grams: sample.servingGrams,
+            serving_unit_name: sample.servingUnit,
           };
         }
       }
@@ -146,6 +183,8 @@ export default function BarcodeScannerScreen() {
               fat_per_100g: onlineProduct.fatPer100g,
               category: onlineProduct.category || 'Packaged Foods',
               barcode: clean,
+              serving_weight_grams: onlineProduct.servingWeightGrams,
+              serving_unit_name: onlineProduct.servingUnitName,
             });
 
             food = {
@@ -158,6 +197,8 @@ export default function BarcodeScannerScreen() {
               category: onlineProduct.category || 'Packaged Foods',
               is_seed: 0,
               barcode: clean,
+              serving_weight_grams: onlineProduct.servingWeightGrams,
+              serving_unit_name: onlineProduct.servingUnitName,
             };
           }
         } catch {
@@ -172,12 +213,137 @@ export default function BarcodeScannerScreen() {
       } else {
         setFeedback({
           tone: 'err',
-          text: `No nutrition data found for barcode ${clean}. You can create it as a custom food.`,
+          text: `No nutrition data found for barcode ${clean}. You can scan its Nutrition Facts label with AI to save it automatically.`,
+          unmatchedBarcode: clean,
         });
       }
     },
     [db],
   );
+
+  /* ---------------- AI NUTRITION LABEL OCR OCR ENGINE ---------------- */
+
+  const runAiLabelScan = async (base64Data: string, barcodeToAttach?: string) => {
+    setAnalyzingLabel(true);
+    setFeedback(null);
+    try {
+      const settings = await getSettings(db);
+      const result = await analyzeNutritionLabelImage(
+        base64Data,
+        barcodeToAttach || barcodeInput || undefined,
+        'image/jpeg',
+        settings.gemini_api_key,
+      );
+
+      const targetBarcode = barcodeToAttach || barcodeInput.trim() || undefined;
+
+      // Automatically store in local SQLite database with barcode attached
+      const newId = await createFood(db, {
+        food_name: result.food_name,
+        calories_per_100g: result.calories_per_100g,
+        protein_per_100g: result.protein_per_100g,
+        carbs_per_100g: result.carbs_per_100g,
+        fat_per_100g: result.fat_per_100g,
+        category: result.category || 'Packaged Foods',
+        barcode: targetBarcode,
+        serving_weight_grams: result.serving_weight_grams,
+        serving_unit_name: result.serving_unit_name,
+      });
+
+      const identified: Food = {
+        id: newId,
+        food_name: result.food_name,
+        calories_per_100g: result.calories_per_100g,
+        protein_per_100g: result.protein_per_100g,
+        carbs_per_100g: result.carbs_per_100g,
+        fat_per_100g: result.fat_per_100g,
+        category: result.category || 'Packaged Foods',
+        is_seed: 0,
+        barcode: targetBarcode,
+        serving_weight_grams: result.serving_weight_grams,
+        serving_unit_name: result.serving_unit_name,
+      };
+
+      setFoundFood(identified);
+      if (targetBarcode) setBarcodeInput(targetBarcode);
+      setFeedback({
+        tone: 'ok',
+        text: `✨ AI extracted Nutrition Facts for "${result.food_name}" & saved to offline database!`,
+      });
+    } catch (err: any) {
+      setFeedback({
+        tone: 'err',
+        text: err?.message || 'Could not read nutrition facts. Try a clearer, closer photo of the label.',
+      });
+    } finally {
+      setAnalyzingLabel(false);
+    }
+  };
+
+  const startScanLabel = async (targetBarcode?: string) => {
+    if (isWeb) {
+      labelFileInputRef.current?.click();
+      return;
+    }
+
+    // Native: Capture label with device camera
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        setFeedback({
+          tone: 'err',
+          text: 'Camera permission is required to photograph the packaging label.',
+        });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+
+      // Downscale to 1024px for quick Gemini OCR processing
+      const ctx = ImageManipulator.manipulate(asset.uri);
+      ctx.resize({ width: 1024, height: null });
+      const rendered = await ctx.renderAsync();
+      const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.82, base64: true });
+
+      if (saved.base64) {
+        await runAiLabelScan(saved.base64, targetBarcode);
+      }
+    } catch {
+      setFeedback({ tone: 'err', text: 'Could not capture photo. Please try again.' });
+    }
+  };
+
+  const analyzeAssetDirectly = async (asset: any) => {
+    if (!asset?.uri) return;
+    try {
+      setAnalyzingLabel(true);
+      const ctx = ImageManipulator.manipulate(asset.uri);
+      ctx.resize({ width: 1024, height: null });
+      const rendered = await ctx.renderAsync();
+      const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.82, base64: true });
+      if (saved.base64) {
+        await runAiLabelScan(saved.base64, barcodeInput || undefined);
+      }
+    } catch {
+      setFeedback({ tone: 'err', text: 'Failed to process packaging image.' });
+    } finally {
+      setAnalyzingLabel(false);
+    }
+  };
+
+  const onPickLabelImageWeb = (e: any) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      runAiLabelScan(dataUrl, barcodeInput || undefined);
+    };
+    reader.readAsDataURL(file);
+  };
 
   /* ---------------- WEB CAMERA (zxing, unchanged) ---------------- */
 
@@ -220,7 +386,6 @@ export default function BarcodeScannerScreen() {
   const onPickImageWeb = async (e: any) => {
     const file = e.target?.files?.[0];
     if (!file) return;
-    // Reset input so picking the same file again re-triggers change
     e.target.value = '';
     setDecodingImage(true);
     setFeedback(null);
@@ -238,7 +403,7 @@ export default function BarcodeScannerScreen() {
     } catch {
       setFeedback({
         tone: 'err',
-        text: 'Could not detect a barcode in that image. Try a clearer, well-lit, close-up photo of the barcode.',
+        text: 'Could not detect barcode lines. You can read the packaging label with AI directly.',
       });
     } finally {
       setDecodingImage(false);
@@ -305,7 +470,8 @@ export default function BarcodeScannerScreen() {
       } else {
         setFeedback({
           tone: 'err',
-          text: 'Could not detect a barcode in that image. Try a clearer, well-lit, close-up photo of the barcode.',
+          text: 'Could not detect barcode lines in that image. You can analyze the packaging/label with AI instead.',
+          pendingAsset: asset,
         });
       }
     } catch {
@@ -338,15 +504,24 @@ export default function BarcodeScannerScreen() {
       subtitle="Live camera, photo import, or manual EAN/UPC entry"
       onBack={() => router.back()}
     >
-      {/* Hidden file input for image import (web) */}
+      {/* Hidden file inputs for web */}
       {isWeb ? (
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={onPickImageWeb}
-        />
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={onPickImageWeb}
+          />
+          <input
+            ref={labelFileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={onPickLabelImageWeb}
+          />
+        </>
       ) : null}
 
       {/* 1. CAMERA VIEWFINDER */}
@@ -388,7 +563,7 @@ export default function BarcodeScannerScreen() {
         </View>
 
         {/* Controls */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, justifyContent: 'center' }}>
           <Pressable
             onPress={() => (scanning ? stopCamera() : startCamera())}
             style={[
@@ -413,7 +588,19 @@ export default function BarcodeScannerScreen() {
           >
             <Ionicons name="image-outline" size={16} color={C.blue} />
             <Txt size="xs" weight="800" color={C.blue}>
-              {decodingImage ? 'Reading Photo...' : 'Import Barcode Photo'}
+              {decodingImage ? 'Reading Photo...' : 'Import Photo'}
+            </Txt>
+          </Pressable>
+
+          {/* AI Nutrition Label OCR Button */}
+          <Pressable
+            onPress={() => startScanLabel()}
+            disabled={analyzingLabel}
+            style={[st.actionPill, { borderColor: C.accent + '60' }, analyzingLabel && { opacity: 0.6 }]}
+          >
+            <Ionicons name="sparkles" size={15} color={C.accent} />
+            <Txt size="xs" weight="800" color={C.accent}>
+              AI Label OCR
             </Txt>
           </Pressable>
 
@@ -435,7 +622,22 @@ export default function BarcodeScannerScreen() {
         </View>
       </Card>
 
-      {/* 2. FEEDBACK BANNER */}
+      {/* 2. AI LABEL ANALYZING LOADING INDICATOR */}
+      {analyzingLabel ? (
+        <Card style={{ padding: 16, alignItems: 'center', gap: 10, borderColor: C.accent, borderWidth: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <ActivityIndicator size="small" color={C.accent} />
+            <Txt size="sm" weight="800" color={C.text}>
+              Reading Nutrition Facts with Gemini OCR...
+            </Txt>
+          </View>
+          <Txt size="xs" color={C.dim} align="center">
+            Extracting food name, serving size, and per-100g calories &amp; macros
+          </Txt>
+        </Card>
+      ) : null}
+
+      {/* 3. FEEDBACK BANNER */}
       {feedback ? (
         <Card style={{ borderColor: feedback.tone === 'ok' ? C.accent : C.warn }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -448,10 +650,33 @@ export default function BarcodeScannerScreen() {
               {feedback.text}
             </Txt>
           </View>
+
+          {feedback.unmatchedBarcode ? (
+            <View style={{ marginTop: 10 }}>
+              <Button
+                title="📷 Snap Photo of Nutrition Label with AI"
+                small
+                onPress={() => startScanLabel(feedback.unmatchedBarcode)}
+                disabled={analyzingLabel}
+              />
+            </View>
+          ) : null}
+
+          {feedback.pendingAsset ? (
+            <View style={{ marginTop: 10 }}>
+              <Button
+                title="✨ Read Packaging Label from this Photo"
+                small
+                variant="secondary"
+                onPress={() => analyzeAssetDirectly(feedback.pendingAsset)}
+                disabled={analyzingLabel}
+              />
+            </View>
+          ) : null}
         </Card>
       ) : null}
 
-      {/* 3. MATCHED SCANNED PRODUCT PREVIEW */}
+      {/* 4. MATCHED SCANNED PRODUCT PREVIEW */}
       {foundFood ? (
         <Card highlight style={{ borderColor: C.accent }}>
           <CardTitle icon={<Ionicons name="checkmark-circle" size={16} color={C.accent} />}>
@@ -462,18 +687,36 @@ export default function BarcodeScannerScreen() {
               {foundFood.food_name}
             </Txt>
             <Txt size="xs" color={C.dimmer} weight="600">
-              {`Barcode: ${foundFood.barcode ?? 'EAN-13'}`}
+              {`Barcode: ${foundFood.barcode ?? 'Custom Label OCR'}`}
             </Txt>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-              <View style={st.calBadge}>
-                <Txt size="sm" weight="800" color={C.kcal}>
-                  {`${fmtInt(foundFood.calories_per_100g)} kcal / 100g`}
+            {foundFood.serving_weight_grams && foundFood.serving_weight_grams !== 100 ? (
+              <View style={{ gap: 4, marginTop: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[st.calBadge, { backgroundColor: C.accentSoft }]}>
+                    <Txt size="sm" weight="900" color={C.accent}>
+                      {`${Math.round((foundFood.calories_per_100g * foundFood.serving_weight_grams) / 100)} kcal`}
+                    </Txt>
+                  </View>
+                  <Txt size="xs" weight="800" color={C.text}>
+                    {`per 1 ${foundFood.serving_unit_name || 'Serving'} (${foundFood.serving_weight_grams}g)`}
+                  </Txt>
+                </View>
+                <Txt size="xs" color={C.dim} weight="600">
+                  {`${Math.round(foundFood.protein_per_100g * (foundFood.serving_weight_grams / 100) * 10) / 10}P  ${Math.round(foundFood.carbs_per_100g * (foundFood.serving_weight_grams / 100) * 10) / 10}C  ${Math.round(foundFood.fat_per_100g * (foundFood.serving_weight_grams / 100) * 10) / 10}F`}
                 </Txt>
               </View>
-              <Txt size="xs" color={C.dim} weight="600">
-                {`${fmtInt(foundFood.protein_per_100g)}P  ${fmtInt(foundFood.carbs_per_100g)}C  ${fmtInt(foundFood.fat_per_100g)}F`}
-              </Txt>
-            </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <View style={st.calBadge}>
+                  <Txt size="sm" weight="800" color={C.kcal}>
+                    {`${fmtInt(foundFood.calories_per_100g)} kcal / 100g`}
+                  </Txt>
+                </View>
+                <Txt size="xs" color={C.dim} weight="600">
+                  {`${fmtInt(foundFood.protein_per_100g)}P  ${fmtInt(foundFood.carbs_per_100g)}C  ${fmtInt(foundFood.fat_per_100g)}F`}
+                </Txt>
+              </View>
+            )}
           </View>
           <Button
             title="Log & Weigh on Scale"
@@ -482,7 +725,7 @@ export default function BarcodeScannerScreen() {
         </Card>
       ) : null}
 
-      {/* 4. MANUAL BARCODE DIGIT ENTRY */}
+      {/* 5. MANUAL BARCODE DIGIT ENTRY */}
       <Card>
         <CardTitle icon={<Ionicons name="keypad-outline" size={15} color={C.accent} />}>
           LOOKUP BY BARCODE NUMBER
@@ -569,7 +812,7 @@ const st = StyleSheet.create({
     gap: 6,
     backgroundColor: C.surfaceHi,
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 7,
     borderWidth: 1,
     borderColor: C.border,

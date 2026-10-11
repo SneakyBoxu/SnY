@@ -247,7 +247,7 @@ export default function SettingsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="flag" size={16} color={C.accent} />
               <Txt size="md" weight="900" color={C.text}>
-                {`Target: ${fmtNum(settings.target_weight_kg ?? 70, 1)} kg (${settings.phase})`}
+                {`Target: ${fmtNum(settings.target_weight_kg ?? 70, 2)} kg (${settings.phase})`}
               </Txt>
             </View>
             <Txt size="xs" color={C.dim} weight="600">

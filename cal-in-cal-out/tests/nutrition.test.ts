@@ -124,4 +124,22 @@ console.log('Running nutrition calculation & serving tests...');
   console.log('  ok - foodToFoodItem correctly initializes packaged and bulk food items');
 }
 
+// 5. Test unit normalization when serving unit is 'g' (e.g. Jack 'n Jill Piattos 30g)
+{
+  const item = foodToFoodItem({
+    food_name: "Jack 'n Jill Piattos Cheese Flavored Potato Crisps",
+    calories_per_100g: 500,
+    protein_per_100g: 7,
+    carbs_per_100g: 63,
+    fat_per_100g: 27,
+    serving_weight_grams: 30,
+    serving_unit_name: 'g',
+  });
+  assertEq(item.baseWeightGrams, 30);
+  assertEq(item.servingUnitName, 'Serving', 'servingUnitName should normalize from g to Serving');
+  assertEq(item.baseCalories, 150, '30g serving should have 150 kcal');
+  assertEq(item.baseProtein, 2.1, '30g serving should have 2.1g protein');
+  console.log('  ok - foodToFoodItem correctly normalizes gram unit to Serving with 150 kcal');
+}
+
 console.log('All nutrition tests passed!');

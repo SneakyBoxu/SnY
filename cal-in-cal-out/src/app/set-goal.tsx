@@ -56,8 +56,8 @@ export default function SetGoalScreen() {
 
   // Rate Slider dragging state
   const [isDraggingRate, setIsDraggingRate] = useState(false);
-  const sliderTrackRef = useRef<any>(null);
-  const sliderBounds = useRef<{ left: number; width: number }>({ left: 0, width: 300 });
+  const [rateSliderWidth, setRateSliderWidth] = useState(300);
+  const rateDragStartInfo = useRef<{ locationX: number; pageX: number }>({ locationX: 0, pageX: 0 });
 
   useEffect(() => {
     let live = true;
@@ -124,10 +124,10 @@ export default function SetGoalScreen() {
   };
 
   // Pointer / Touch handlers for Rate Slider scrubbing
-  const updateRateFromPointer = (clientX: number) => {
-    const bounds = sliderBounds.current;
-    if (bounds.width <= 0) return;
-    const ratio = Math.max(0, Math.min(1, (clientX - bounds.left) / bounds.width));
+  const updateRateFromX = (x: number) => {
+    if (rateSliderWidth <= 0) return;
+    const clampedX = Math.max(0, Math.min(rateSliderWidth, x));
+    const ratio = clampedX / rateSliderWidth;
     const rawRate = 0.1 + ratio * (1.5 - 0.1);
     const stepped = Math.round(rawRate / 0.05) * 0.05;
     const next = Math.max(0.1, Math.min(1.5, round(stepped, 2)));
@@ -136,29 +136,22 @@ export default function SetGoalScreen() {
 
   const handleRatePointerDown = (e: any) => {
     e.stopPropagation?.();
-    const clientX =
-      e.clientX ??
-      e.nativeEvent?.clientX ??
-      e.nativeEvent?.pageX ??
-      e.nativeEvent?.touches?.[0]?.pageX ??
-      0;
+    const locX = e.nativeEvent?.locationX ?? 0;
+    const pX = e.nativeEvent?.pageX ?? e.clientX ?? locX;
+    rateDragStartInfo.current = { locationX: locX, pageX: pX };
     try {
       e.target?.setPointerCapture?.(e.pointerId);
     } catch {}
     setIsDraggingRate(true);
-    updateRateFromPointer(clientX);
+    updateRateFromX(locX);
   };
 
   const handleRatePointerMove = (e: any) => {
     if (!isDraggingRate) return;
     e.stopPropagation?.();
-    const clientX =
-      e.clientX ??
-      e.nativeEvent?.clientX ??
-      e.nativeEvent?.pageX ??
-      e.nativeEvent?.touches?.[0]?.pageX ??
-      0;
-    updateRateFromPointer(clientX);
+    const pX = e.nativeEvent?.pageX ?? e.clientX ?? 0;
+    const dx = pX - rateDragStartInfo.current.pageX;
+    updateRateFromX(rateDragStartInfo.current.locationX + dx);
   };
 
   const handleRatePointerUp = (e?: any) => {
@@ -370,9 +363,9 @@ export default function SetGoalScreen() {
             <View style={st.stepperInfoBadge}>
               <Txt size="xs" weight="700" color={C.dim}>
                 {plan.goalType === 'CUT'
-                  ? `Lose ${fmtNum(plan.absDeltaKg, 1)} kg from current (${fmtNum(currentWeight, 1)} kg)`
+                  ? `Lose ${fmtNum(plan.absDeltaKg, 2)} kg from current (${fmtNum(currentWeight, 2)} kg)`
                   : plan.goalType === 'BULK'
-                    ? `Gain ${fmtNum(plan.absDeltaKg, 1)} kg from current (${fmtNum(currentWeight, 1)} kg)`
+                    ? `Gain ${fmtNum(plan.absDeltaKg, 2)} kg from current (${fmtNum(currentWeight, 2)} kg)`
                     : 'Maintain current bodyweight'}
               </Txt>
             </View>
@@ -420,15 +413,9 @@ export default function SetGoalScreen() {
 
           {/* Interactive Hold & Drag Rate Slider Bar */}
           <View
-            ref={sliderTrackRef}
             onLayout={(e) => {
               const { width } = e.nativeEvent.layout;
-              if (Platform.OS === 'web' && sliderTrackRef.current?.getBoundingClientRect) {
-                const rect = sliderTrackRef.current.getBoundingClientRect();
-                sliderBounds.current = { left: rect.left, width: rect.width || width };
-              } else {
-                sliderBounds.current = { left: 20, width: width || 300 };
-              }
+              if (width > 0) setRateSliderWidth(width);
             }}
             onStartShouldSetResponder={() => true}
             onMoveShouldSetResponder={() => true}
@@ -462,7 +449,7 @@ export default function SetGoalScreen() {
               style={[
                 st.rateSliderThumb,
                 {
-                  left: `calc(${rateSliderPct}% - 14px)` as any,
+                  left: (rateSliderPct / 100) * Math.max(0, rateSliderWidth - 24),
                   borderColor: plan.rateZone.color,
                   transform: [{ scale: isDraggingRate ? 1.25 : 1 }],
                 },
@@ -627,14 +614,14 @@ export default function SetGoalScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ gap: 2 }}>
                 <Txt size="xs" color={C.dim} weight="700">START WEIGHT</Txt>
-                <Txt size="lg" weight="900" color={C.text}>{`${fmtNum(currentWeight, 1)} kg`}</Txt>
+                <Txt size="lg" weight="900" color={C.text}>{`${fmtNum(currentWeight, 2)} kg`}</Txt>
               </View>
 
               <Ionicons name="arrow-forward" size={20} color={C.accent} />
 
               <View style={{ gap: 2, alignItems: 'flex-end' }}>
                 <Txt size="xs" color={C.accent} weight="700">TARGET GOAL</Txt>
-                <Txt size="lg" weight="900" color={C.accent}>{`${fmtNum(targetWeight, 1)} kg`}</Txt>
+                <Txt size="lg" weight="900" color={C.accent}>{`${fmtNum(targetWeight, 2)} kg`}</Txt>
               </View>
             </View>
 
@@ -738,7 +725,7 @@ export default function SetGoalScreen() {
             <View style={st.successSummaryBox}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Txt size="xs" color={C.dim} weight="600">Target Goal</Txt>
-                <Txt size="sm" weight="900" color={C.text}>{`${fmtNum(targetWeight, 1)} kg (${plan.phase})`}</Txt>
+                <Txt size="sm" weight="900" color={C.text}>{`${fmtNum(targetWeight, 2)} kg (${plan.phase})`}</Txt>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Txt size="xs" color={C.dim} weight="600">Weekly Pace</Txt>

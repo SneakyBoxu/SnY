@@ -155,10 +155,11 @@ export default function AddEntryScreen() {
     setIsPickerOpen(false);
     setFoodSearchQuery('');
 
+    const rawUnit = (item.servingUnitName || '').trim().toLowerCase();
+    const isGramUnit = ['g', 'gram', 'grams', 'gr'].includes(rawUnit);
     const hasNativeServing =
-      Boolean(item.servingUnitName) &&
-      item.baseWeightGrams > 0 &&
-      Math.abs(item.baseWeightGrams - 100) > 0.01;
+      (Boolean(item.servingUnitName) && !isGramUnit && item.baseWeightGrams > 0 && Math.abs(item.baseWeightGrams - 100) > 0.01) ||
+      (item.baseWeightGrams > 0 && Math.abs(item.baseWeightGrams - 100) > 0.01);
 
     if (hasNativeServing) {
       setSelectedUnitId('serving');
@@ -332,18 +333,20 @@ export default function AddEntryScreen() {
    * followed by Grams (Scale Weight) as the secondary option.
    */
   const unitOptions: UnitOption[] = useMemo(() => {
+    const rawUnit = (foodItem?.servingUnitName || '').trim().toLowerCase();
+    const isGramUnit = ['g', 'gram', 'grams', 'gr'].includes(rawUnit);
     const hasNativeServing =
-      Boolean(foodItem?.servingUnitName) &&
       (foodItem?.baseWeightGrams ?? 0) > 0 &&
       Math.abs((foodItem?.baseWeightGrams ?? 0) - 100) > 0.01;
 
     const list: UnitOption[] = [];
 
     if (hasNativeServing && foodItem) {
+      const cleanUnit = (!rawUnit || isGramUnit) ? 'serving' : rawUnit;
       list.push({
         id: 'serving',
-        label: `1 ${foodItem.servingUnitName} (${foodItem.baseWeightGrams}g)`,
-        short: foodItem.servingUnitName || 'serving',
+        label: `1 ${cleanUnit} (${foodItem.baseWeightGrams}g)`,
+        short: cleanUnit,
         grams: foodItem.baseWeightGrams,
       });
       list.push({
@@ -755,16 +758,22 @@ export default function AddEntryScreen() {
                 </Txt>
                 <View style={st.refPill}>
                   <Txt size="xs" weight="700" color={C.dim}>
-                    {foodItem && foodItem.servingUnitName
-                      ? `${foodItem.baseCalories} kcal / ${foodItem.servingUnitName}`
+                    {foodItem && foodItem.baseWeightGrams && Math.abs(foodItem.baseWeightGrams - 100) > 0.01
+                      ? `${foodItem.baseCalories} kcal / ${(() => {
+                          const u = (foodItem.servingUnitName || 'serving').trim().toLowerCase();
+                          return ['g', 'gram', 'grams', 'gr'].includes(u) ? 'serving' : u;
+                        })()}`
                       : `${per100.calories} kcal / 100g`}
                   </Txt>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Txt size="xs" color={C.dimmer} weight="600">
-                  {foodItem && foodItem.servingUnitName
-                    ? `Per ${foodItem.servingUnitName}: ${foodItem.baseProtein}g P · ${foodItem.baseCarbs}g C · ${foodItem.baseFat}g F`
+                  {foodItem && foodItem.baseWeightGrams && Math.abs(foodItem.baseWeightGrams - 100) > 0.01
+                    ? `Per ${(() => {
+                        const u = (foodItem.servingUnitName || 'serving').trim().toLowerCase();
+                        return ['g', 'gram', 'grams', 'gr'].includes(u) ? 'serving' : u;
+                      })()} (${foodItem.baseWeightGrams}g): ${foodItem.baseProtein}g P · ${foodItem.baseCarbs}g C · ${foodItem.baseFat}g F`
                     : `Per 100g: ${per100.protein}g P · ${per100.carbs}g C · ${per100.fat}g F`}
                 </Txt>
                 <Pressable
@@ -937,10 +946,18 @@ export default function AddEntryScreen() {
                   })
                 : [0.5, 1, 1.5, 2, 3, 4, 5].map((n) => {
                     const isCurrent = amountStr === String(n);
+                    const rawUnit = activeUnit.short.toLowerCase();
+                    const isGram = ['g', 'gram', 'grams', 'gr'].includes(rawUnit);
+                    const cleanShort = isGram ? 'serving' : activeUnit.short;
+                    const chipLabel = isGram
+                      ? `${n}g`
+                      : n === 1
+                        ? `1 ${cleanShort}`
+                        : `${n} ${cleanShort.endsWith('s') ? cleanShort : cleanShort + 's'}`;
                     return (
                       <Chip
                         key={n}
-                        label={`${n} ${activeUnit.short}${n > 1 ? 's' : ''}`}
+                        label={chipLabel}
                         active={isCurrent}
                         onPress={() => setAmountStr(String(n))}
                       />

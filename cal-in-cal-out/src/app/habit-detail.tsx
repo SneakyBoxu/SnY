@@ -129,9 +129,9 @@ export default function HabitDetailScreen() {
         const w = log?.weight_kg;
         if (w !== null && w !== undefined) {
           isTracked = true;
-          valueText = `${fmtNum(w)} kg scale weight`;
+          valueText = `${fmtNum(w, 2)} kg scale weight`;
           if (log?.weight_trend_kg !== null && log?.weight_trend_kg !== undefined) {
-            subText = `Trend: ${fmtNum(log.weight_trend_kg)} kg`;
+            subText = `Trend: ${fmtNum(log.weight_trend_kg, 2)} kg`;
           }
         }
       } else if (selectedHabit === 'workout') {
@@ -223,7 +223,7 @@ export default function HabitDetailScreen() {
   if (selectedHabit === 'food') {
     todayStatValue = todayLog?.total_calories ? fmtInt(todayLog.total_calories) : '0';
   } else if (selectedHabit === 'weighIn') {
-    todayStatValue = todayLog?.weight_kg ? fmtNum(todayLog.weight_kg) : '—';
+    todayStatValue = todayLog?.weight_kg ? fmtNum(todayLog.weight_kg, 2) : '—';
   } else if (selectedHabit === 'workout') {
     todayStatValue = allWorkoutDates.has(today) ? 'Logged' : 'Rest Day';
     todayStatUnit = '';
