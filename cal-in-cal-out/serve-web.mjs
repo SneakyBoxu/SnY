@@ -92,11 +92,10 @@ const server = http.createServer((req, res) => {
           '';
 
         const models = [
-          'gemini-1.5-flash-8b',
-          'gemini-1.5-flash',
-          'gemini-2.0-flash',
-          'gemini-2.5-flash',
+          'gemini-3.8-flash',
           'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.6-flash',
         ];
         let lastRespText = '';
         let lastStatus = 500;

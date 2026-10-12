@@ -45,28 +45,28 @@ function resolveApiKey(customApiKey?: string): string {
   return key;
 }
 
-/** High-speed OCR and label-reading cascade (prioritizes 1.5-flash-8b for fast text extraction) */
+/** High-speed OCR and label-reading cascade */
 const OCR_MODELS = [
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
 ];
 
 /** Multimodal visual plate segmentation models */
 const VISION_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
 ];
 
 /** Natural language text parser models */
 const TEXT_MODELS = [
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
 ];
 
 async function callGeminiWithCascade({
@@ -426,7 +426,7 @@ export async function testGeminiKey(customApiKey?: string): Promise<string> {
   };
 
   await callGeminiWithCascade({
-    models: ['gemini-1.5-flash-8b', 'gemini-1.5-flash'],
+    models: ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'],
     apiKey,
     requestBody,
     timeoutMs: 15000,

@@ -85,7 +85,7 @@ async function handleGeminiVision(req, res) {
   const apiKey =
     req.headers['x-gemini-key'] || process.env.GEMINI_API_KEY || '';
 
-  const models = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  const models = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash'];
   let lastStatus = 500;
   let lastRespText = JSON.stringify({ error: 'No API key' });
 
